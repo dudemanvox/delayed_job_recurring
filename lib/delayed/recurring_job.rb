@@ -39,13 +39,18 @@ module Delayed
 
       enqueue_opts = { priority: @schedule_options[:priority], run_at: next_run_time }
       enqueue_opts[:queue] = @schedule_options[:queue] if @schedule_options[:queue]
+      # Merge in any custom options which need to be passed to the job during enqueue
+      @schedule_options[:job_options] ||= {}
+      @schedule_options[:job_options].each do |opt, val|
+        self.try("#{opt}=", val)
+      end
 
       Delayed::Job.transaction do
         self.class.jobs(@schedule_options).destroy_all
         if Gem.loaded_specs['delayed_job'].version.to_s.first.to_i < 3
           Delayed::Job.enqueue self, enqueue_opts[:priority], enqueue_opts[:run_at]
         else
-          Delayed::Job.enqueue self, enqueue_opts
+          Delayed::Job.enqueue(self, enqueue_opts)
         end
       end
     end
